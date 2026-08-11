@@ -169,6 +169,10 @@ GetHandleObjectName(
     if (!NameInfo)
         return NULL;
 
+    Status = NtQueryObject(Handle, ObjectNameInformation, NameInfo, Size, &Size);
+    if (!NT_SUCCESS(Status))
+        return NULL;
+
     if (!NameInfo->Name.Buffer || NameInfo->Name.Length == 0)
         return NULL;
 
@@ -205,6 +209,12 @@ BuildAbsoluteRegistryPath(
     if (!Result)
         return NULL;
 
+    Result->Buffer = (PWCHAR)((ULONG_PTR)Result + sizeof(*Result));
+    Result->Length = NewLength;
+    Result->MaximumLength = NewLength;
+
+    RtlCopyMemory(Result->Buffer, RootName->Buffer, RootName->Length);
+
     if (SeparatorLength)
         Result->Buffer[RootName->Length / sizeof(WCHAR)] = L'\\';
 
@@ -214,6 +224,7 @@ BuildAbsoluteRegistryPath(
 
     return Result;
 }
+
 static
 BOOLEAN
 GetRegistryRedirect(
