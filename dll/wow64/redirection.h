@@ -125,8 +125,29 @@ GetFileRedirect(OBJECT_ATTRIBUTES* attr)
  * For now, only handle the most important case:
  * \Registry\Machine\Software -> \Registry\Machine\Software\Wow6432Node
  *
- * TODO: Shared keys and the full exception list
+ * TODO: Full exception list
  */
+
+
+static
+BOOLEAN
+IsPrefixMatch(
+    _In_ PUNICODE_STRING Path,
+    _In_ PCUNICODE_STRING Prefix)
+{
+    if (Path->Length < Prefix->Length)
+        return FALSE;
+
+    if (_wcsnicmp(Path->Buffer, Prefix->Buffer, Prefix->Length / sizeof(WCHAR)) != 0)
+        return FALSE;
+
+    /* Exact match or next char is a path separator */
+    if (Path->Length == Prefix->Length)
+        return TRUE;
+
+    return Path->Buffer[Prefix->Length / sizeof(WCHAR)] == L'\\';
+}
+
 static
 BOOLEAN
 GetRegistryRedirect(
@@ -137,11 +158,45 @@ GetRegistryRedirect(
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software");
     static const UNICODE_STRING WowNode =
         RTL_CONSTANT_STRING(L"\\Wow6432Node");
+
+    /* Under Software\Classes these stay redirected (even though Classes is shared) */
+    static const UNICODE_STRING RedirectedUnderClasses[] =
+    {
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Classes\\CLSID"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Classes\\Interface"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Classes\\DirectShow"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Classes\\Media Type"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Classes\\MediaFoundation"),
+    };
+
+    /* The following keys are shared keys that exist in ReactOS hives but are Win7+. */
+    static const UNICODE_STRING SharedPrefixes[] =
+    {
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Classes"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Clients"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Ole"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Rpc"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows\\CurrentVersion\\App Paths"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows\\CurrentVersion\\Setup"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Console"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\FontLink"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\FontMapper"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\FontSubstitutes"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Ports"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Print"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Time Zones"),
+    }
+
     PUNICODE_STRING ObjectName;
     PUNICODE_STRING NewName;
     USHORT NewLength;
     ACCESS_MASK Access;
     BOOLEAN Want32BitView;
+    ULONG i;
+    BOOLEAN ForceRedirect = FALSE;
 
     if (!attr || !attr->ObjectName || !attr->ObjectName->Buffer)
         return FALSE;
@@ -152,6 +207,7 @@ GetRegistryRedirect(
 
     Access = *DesiredAccess;
 
+    /* TODO: This should fail with invalid parameter! */
     if ((Access & KEY_WOW64_32KEY) && (Access & KEY_WOW64_64KEY))
         return FALSE;
 
@@ -186,6 +242,25 @@ GetRegistryRedirect(
                   WowNode.Length / sizeof(WCHAR)) == 0)
     {
         return FALSE;
+    }
+
+    /* Classes children that remain redirected */
+    for (i = 0; i < RTL_NUMBER_OF(RedirectedUnderClasses); i++)
+    {
+        if (IsPrefixMatch(ObjectName, &RedirectedUnderClasses[i]))
+        {
+            ForceRedirect = TRUE;
+            break;
+        }
+    }
+
+    if (!ForceRedirect)
+    {
+        for (i = 0; i < RTL_NUMBER_OF(SharedPrefixes); i++)
+        {
+            if (IsPrefixMatch(ObjectName, &SharedPrefixes[i]))
+                return FALSE;
+        }
     }
 
     NewLength = ObjectName->Length + WowNode.Length;
