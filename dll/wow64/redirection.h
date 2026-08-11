@@ -149,6 +149,72 @@ IsPrefixMatch(
 }
 
 static
+PUNICODE_STRING
+GetHandleObjectName(
+    _In_ HANDLE Handle)
+{
+    POBJECT_NAME_INFORMATION NameInfo;
+    PUNICODE_STRING Result;
+    ULONG Size = 0;
+    NTSTATUS Status;
+
+    Status = NtQueryObject(Handle, ObjectNameInformation, NULL, 0, &Size);
+    if (Status != STATUS_INFO_LENGTH_MISMATCH && Status != STATUS_BUFFER_TOO_SMALL)
+        return NULL;
+
+    if (Size == 0)
+        return NULL;
+
+    NameInfo = Wow64AllocateTemp(Size);
+    if (!NameInfo)
+        return NULL;
+
+    if (!NameInfo->Name.Buffer || NameInfo->Name.Length == 0)
+        return NULL;
+
+    Result = Wow64AllocateTemp(sizeof(*Result));
+    if (!Result)
+        return NULL;
+
+    *Result = NameInfo->Name;
+    return Result;
+}
+
+static
+PUNICODE_STRING
+BuildAbsoluteRegistryPath(
+    _In_ PCUNICODE_STRING RootName,
+    _In_ PCUNICODE_STRING RelativeName)
+{
+    PUNICODE_STRING Result;
+    USHORT NewLength;
+    USHORT SeparatorLength = 0;
+    BOOLEAN NeedSeparator;
+
+    NeedSeparator = (RelativeName->Length != 0) &&
+                    !(RootName->Length != 0 &&
+                      RootName->Buffer[RootName->Length / sizeof(WCHAR) - 1] == L'\\') &&
+                    (RelativeName->Buffer[0] != L'\\');
+
+    if (NeedSeparator)
+        SeparatorLength = sizeof(WCHAR);
+
+    NewLength = RootName->Length + SeparatorLength + RelativeName->Length;
+
+    Result = Wow64AllocateTemp(sizeof(*Result) + NewLength);
+    if (!Result)
+        return NULL;
+
+    if (SeparatorLength)
+        Result->Buffer[RootName->Length / sizeof(WCHAR)] = L'\\';
+
+    RtlCopyMemory((PUCHAR)Result->Buffer + RootName->Length + SeparatorLength,
+                  RelativeName->Buffer,
+                  RelativeName->Length);
+
+    return Result;
+}
+static
 BOOLEAN
 GetRegistryRedirect(
     _Inout_ POBJECT_ATTRIBUTES attr,
@@ -188,21 +254,19 @@ GetRegistryRedirect(
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Print"),
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList"),
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Time Zones"),
-    }
+    };
 
     PUNICODE_STRING ObjectName;
+    PUNICODE_STRING RootName;
     PUNICODE_STRING NewName;
     USHORT NewLength;
     ACCESS_MASK Access;
     BOOLEAN Want32BitView;
+    BOOLEAN RelativeOpen;
     ULONG i;
     BOOLEAN ForceRedirect = FALSE;
 
-    if (!attr || !attr->ObjectName || !attr->ObjectName->Buffer)
-        return FALSE;
-
-    /* TODO: Relative opens */
-    if (attr->RootDirectory != NULL)
+    if (!attr || !attr->ObjectName || (!attr->ObjectName->Buffer && attr->ObjectName->Length))
         return FALSE;
 
     Access = *DesiredAccess;
@@ -223,7 +287,24 @@ GetRegistryRedirect(
     if (!Want32BitView)
         return FALSE;
 
-    ObjectName = attr->ObjectName;
+    RelativeOpen = (attr->RootDirectory != NULL);
+
+    if (!RelativeOpen)
+    {
+        ObjectName = attr->ObjectName;
+    }
+    else
+    {
+        /* Resolve what RootDirectory actually points to, since ObjectName is
+         * meaningless on its own here. If we can't find out, don't redirect. */
+        RootName = GetHandleObjectName(attr->RootDirectory);
+        if (!RootName)
+            return FALSE;
+
+        ObjectName = BuildAbsoluteRegistryPath(RootName, attr->ObjectName);
+        if (!ObjectName)
+            return FALSE;
+    }
 
     if (ObjectName->Length < SoftwarePrefix.Length)
         return FALSE;
@@ -286,5 +367,9 @@ GetRegistryRedirect(
     }
 
     attr->ObjectName = NewName;
+
+    if (RelativeOpen)
+        attr->RootDirectory = NULL;
+
     return TRUE;
 }
