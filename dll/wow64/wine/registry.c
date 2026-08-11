@@ -84,7 +84,7 @@ NTSTATUS WINAPI wow64_NtCreateKeyTransacted( UINT *args )
     NTSTATUS status;
 
     *handle_ptr = 0;
-    status = NtCreateKeyTransacted( &handle, access, objattr_32to64( &attr, attr32 ), index,
+    status = NtCreateKeyTransacted( &handle, access, objattr_32to64_registry( &attr, attr32, &access ), index,
                                     unicode_str_32to64( &class, class32 ), options, transacted, dispos );
     put_handle( handle_ptr, handle );
     return status;
@@ -306,7 +306,7 @@ NTSTATUS WINAPI wow64_NtOpenKeyEx( UINT *args )
     NTSTATUS status;
 
     *handle_ptr = 0;
-    status = NtOpenKeyEx( &handle, access, objattr_32to64( &attr, attr32 ), options );
+    status = NtOpenKeyEx( &handle, access, objattr_32to64_registry( &attr, attr32, &access ), options );
     put_handle( handle_ptr, handle );
     return status;
 }
@@ -327,7 +327,7 @@ NTSTATUS WINAPI wow64_NtOpenKeyTransacted( UINT *args )
     NTSTATUS status;
 
     *handle_ptr = 0;
-    status = NtOpenKeyTransacted( &handle, access, objattr_32to64( &attr, attr32 ), transaction );
+    status = NtOpenKeyTransacted( &handle, access, objattr_32to64_registry( &attr, attr32, &access ), transaction );
     put_handle( handle_ptr, handle );
     return status;
 }
@@ -349,7 +349,7 @@ NTSTATUS WINAPI wow64_NtOpenKeyTransactedEx( UINT *args )
     NTSTATUS status;
 
     *handle_ptr = 0;
-    status = NtOpenKeyTransactedEx( &handle, access, objattr_32to64( &attr, attr32 ), options, transaction );
+    status = NtOpenKeyTransactedEx( &handle, access, objattr_32to64_registry( &attr, attr32, &access ), options, transaction );
     put_handle( handle_ptr, handle );
     return status;
 }
