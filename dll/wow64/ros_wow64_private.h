@@ -439,18 +439,21 @@ static inline OBJECT_ATTRIBUTES *
 RosWow64RedirRegistryObjAttributes(
     _Out_ struct object_attr64 *out,
     _In_ const OBJECT_ATTRIBUTES32 *in,
-    _Inout_ PACCESS_MASK DesiredAccess)
+    _Inout_ PACCESS_MASK DesiredAccess,
+    _Out_ NTSTATUS *RedirectStatus)
 {
     OBJECT_ATTRIBUTES *attr = objattr_32to64(out, in);
 
+    *RedirectStatus = STATUS_SUCCESS;
+
     if (attr)
-        GetRegistryRedirect(attr, DesiredAccess);
+        GetRegistryRedirect(attr, DesiredAccess, RedirectStatus);
 
     return attr;
 }
 
-#define objattr_32to64_registry(out, in, access) \
-    RosWow64RedirRegistryObjAttributes(out, in, access)
+#define objattr_32to64_registry(out, in, access, status) \
+    RosWow64RedirRegistryObjAttributes(out, in, access, status)
 
 #define FIXME_DECLARE_TMP_BUF1 \
     WCHAR tmpBuf[MAX_PATH]; \

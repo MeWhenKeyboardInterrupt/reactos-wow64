@@ -55,10 +55,22 @@ NTSTATUS WINAPI wow64_NtCreateKey( UINT *args )
     UNICODE_STRING class;
     HANDLE handle = 0;
     NTSTATUS status;
+    NTSTATUS redirect_status;
+    OBJECT_ATTRIBUTES *attr64;
 
     *handle_ptr = 0;
-    status = NtCreateKey( &handle, access, objattr_32to64_registry( &attr, attr32, &access ), index,
-                          unicode_str_32to64( &class, class32 ), options, dispos );
+    attr64 = objattr_32to64_registry( &attr, attr32, &access, &redirect_status );
+
+    if (NT_SUCCESS(redirect_status))
+    {
+        status = NtCreateKey( &handle, access, attr64, index,
+                              unicode_str_32to64( &class, class32 ), options, dispos );
+    }
+    else
+    {
+        status = redirect_status;
+    }
+
     put_handle( handle_ptr, handle );
     return status;
 }
@@ -82,10 +94,22 @@ NTSTATUS WINAPI wow64_NtCreateKeyTransacted( UINT *args )
     UNICODE_STRING class;
     HANDLE handle = 0;
     NTSTATUS status;
+    NTSTATUS redirect_status;
+    OBJECT_ATTRIBUTES *attr64;
 
     *handle_ptr = 0;
-    status = NtCreateKeyTransacted( &handle, access, objattr_32to64_registry( &attr, attr32, &access ), index,
-                                    unicode_str_32to64( &class, class32 ), options, transacted, dispos );
+    attr64 = objattr_32to64_registry( &attr, attr32, &access, &redirect_status );
+
+    if (NT_SUCCESS(redirect_status))
+    {
+        status = NtCreateKeyTransacted( &handle, access, attr64, index,
+                                        unicode_str_32to64( &class, class32 ), options, transacted, dispos );
+    }
+    else
+    {
+        status = redirect_status;
+    }
+
     put_handle( handle_ptr, handle );
     return status;
 }
@@ -283,9 +307,17 @@ NTSTATUS WINAPI wow64_NtOpenKey( UINT *args )
     struct object_attr64 attr;
     HANDLE handle = 0;
     NTSTATUS status;
+    NTSTATUS redirect_status;
+    OBJECT_ATTRIBUTES *attr64;
 
     *handle_ptr = 0;
-    status = NtOpenKey( &handle, access, objattr_32to64_registry( &attr, attr32, &access ));
+    attr64 = objattr_32to64_registry( &attr, attr32, &access, &redirect_status );
+
+    if (NT_SUCCESS(redirect_status))
+        status = NtOpenKey( &handle, access, attr64 );
+    else
+        status = redirect_status;
+
     put_handle( handle_ptr, handle );
     return status;
 }
@@ -304,9 +336,17 @@ NTSTATUS WINAPI wow64_NtOpenKeyEx( UINT *args )
     struct object_attr64 attr;
     HANDLE handle = 0;
     NTSTATUS status;
+    NTSTATUS redirect_status;
+    OBJECT_ATTRIBUTES *attr64;
 
     *handle_ptr = 0;
-    status = NtOpenKeyEx( &handle, access, objattr_32to64_registry( &attr, attr32, &access ), options );
+    attr64 = objattr_32to64_registry( &attr, attr32, &access, &redirect_status );
+
+    if (NT_SUCCESS(redirect_status))
+        status = NtOpenKeyEx( &handle, access, attr64, options );
+    else
+        status = redirect_status;
+
     put_handle( handle_ptr, handle );
     return status;
 }
@@ -325,9 +365,17 @@ NTSTATUS WINAPI wow64_NtOpenKeyTransacted( UINT *args )
     struct object_attr64 attr;
     HANDLE handle = 0;
     NTSTATUS status;
+    NTSTATUS redirect_status;
+    OBJECT_ATTRIBUTES *attr64;
 
     *handle_ptr = 0;
-    status = NtOpenKeyTransacted( &handle, access, objattr_32to64_registry( &attr, attr32, &access ), transaction );
+    attr64 = objattr_32to64_registry( &attr, attr32, &access, &redirect_status );
+
+    if (NT_SUCCESS(redirect_status))
+        status = NtOpenKeyTransacted( &handle, access, attr64, transaction );
+    else
+        status = redirect_status;
+
     put_handle( handle_ptr, handle );
     return status;
 }
@@ -347,9 +395,17 @@ NTSTATUS WINAPI wow64_NtOpenKeyTransactedEx( UINT *args )
     struct object_attr64 attr;
     HANDLE handle = 0;
     NTSTATUS status;
+    NTSTATUS redirect_status;
+    OBJECT_ATTRIBUTES *attr64;
 
     *handle_ptr = 0;
-    status = NtOpenKeyTransactedEx( &handle, access, objattr_32to64_registry( &attr, attr32, &access ), options, transaction );
+    attr64 = objattr_32to64_registry( &attr, attr32, &access, &redirect_status );
+
+    if (NT_SUCCESS(redirect_status))
+        status = NtOpenKeyTransactedEx( &handle, access, attr64, options, transaction );
+    else
+        status = redirect_status;
+
     put_handle( handle_ptr, handle );
     return status;
 }

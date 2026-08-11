@@ -127,8 +127,6 @@ GetFileRedirect(OBJECT_ATTRIBUTES* attr)
  *
  * TODO: Full exception list
  */
-
-
 static
 BOOLEAN
 IsPrefixMatch(
@@ -229,7 +227,8 @@ static
 BOOLEAN
 GetRegistryRedirect(
     _Inout_ POBJECT_ATTRIBUTES attr,
-    _Inout_ PACCESS_MASK DesiredAccess)
+    _Inout_ PACCESS_MASK DesiredAccess,
+    _Out_ NTSTATUS *RedirectStatus)
 {
     static const UNICODE_STRING SoftwarePrefix =
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software");
@@ -277,14 +276,19 @@ GetRegistryRedirect(
     ULONG i;
     BOOLEAN ForceRedirect = FALSE;
 
+    *RedirectStatus = STATUS_SUCCESS;
+
     if (!attr || !attr->ObjectName || (!attr->ObjectName->Buffer && attr->ObjectName->Length))
         return FALSE;
 
     Access = *DesiredAccess;
 
-    /* TODO: This should fail with invalid parameter! */
+    /* Both flags set is INVALID! */
     if ((Access & KEY_WOW64_32KEY) && (Access & KEY_WOW64_64KEY))
+    {
+        *RedirectStatus = STATUS_INVALID_PARAMETER;
         return FALSE;
+    }
 
     if (Access & KEY_WOW64_64KEY)
         Want32BitView = FALSE;
