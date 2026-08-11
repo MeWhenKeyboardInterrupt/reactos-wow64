@@ -114,3 +114,102 @@ GetFileRedirect(OBJECT_ATTRIBUTES* attr)
 
     return FALSE;
 }
+
+/*
+ * Registry redirection
+ *
+ * For a 32-bit process the default view of certain keys is redirected under
+ * Wow6432Node. KEY_WOW64_64KEY forces the 64 bit view, KEY_WOW64_32KEY forces the 32 bit
+ * view. Both flags set is invalid!
+ *
+ * For now, only handle the most important case:
+ * \Registry\Machine\Software -> \Registry\Machine\Software\Wow6432Node
+ *
+ * TODO: Shared keys and the full exception list
+ */
+static
+BOOLEAN
+GetRegistryRedirect(
+    _Inout_ POBJECT_ATTRIBUTES attr,
+    _Inout_ PACCESS_MASK DesiredAccess)
+{
+    static const UNICODE_STRING SoftwarePrefix =
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software");
+    static const UNICODE_STRING WowNode =
+        RTL_CONSTANT_STRING(L"\\Wow6432Node");
+    PUNICODE_STRING ObjectName;
+    PUNICODE_STRING NewName;
+    USHORT NewLength;
+    ACCESS_MASK Access;
+    BOOLEAN Want32BitView;
+
+    if (!attr || !attr->ObjectName || !attr->ObjectName->Buffer)
+        return FALSE;
+
+    /* TODO: Relative opens */
+    if (attr->RootDirectory != NULL)
+        return FALSE;
+
+    Access = *DesiredAccess;
+
+    if ((Access & KEY_WOW64_32KEY) && (Access & KEY_WOW64_64KEY))
+        return FALSE;
+
+    if (Access & KEY_WOW64_64KEY)
+        Want32BitView = FALSE;
+    else if (Access & KEY_WOW64_32KEY)
+        Want32BitView = TRUE;
+    else
+        Want32BitView = TRUE; /* WOW64 process default */
+
+    *DesiredAccess = Access & ~(KEY_WOW64_32KEY | KEY_WOW64_64KEY);
+
+    if (!Want32BitView)
+        return FALSE;
+
+    ObjectName = attr->ObjectName;
+
+    if (ObjectName->Length < SoftwarePrefix.Length)
+        return FALSE;
+
+    if (_wcsnicmp(ObjectName->Buffer,
+                  SoftwarePrefix.Buffer,
+                  SoftwarePrefix.Length / sizeof(WCHAR)) != 0)
+    {
+        return FALSE;
+    }
+
+    /* Already under Wow6432Node */
+    if (ObjectName->Length >= SoftwarePrefix.Length + WowNode.Length &&
+        _wcsnicmp(ObjectName->Buffer + (SoftwarePrefix.Length / sizeof(WCHAR)),
+                  WowNode.Buffer,
+                  WowNode.Length / sizeof(WCHAR)) == 0)
+    {
+        return FALSE;
+    }
+
+    NewLength = ObjectName->Length + WowNode.Length;
+    NewName = Wow64AllocateTemp(sizeof(*NewName) + NewLength);
+    if (!NewName)
+        return FALSE;
+
+    NewName->Buffer = (PWCHAR)((ULONG_PTR)NewName + sizeof(*NewName));
+    NewName->Length = NewLength;
+    NewName->MaximumLength = NewLength;
+
+    RtlCopyMemory(NewName->Buffer, ObjectName->Buffer, SoftwarePrefix.Length);
+    RtlCopyMemory(NewName->Buffer + (SoftwarePrefix.Length / sizeof(WCHAR)),
+                  WowNode.Buffer,
+                  WowNode.Length);
+
+    if (ObjectName->Length > SoftwarePrefix.Length)
+    {
+        RtlCopyMemory(NewName->Buffer +
+                          ((SoftwarePrefix.Length + WowNode.Length) / sizeof(WCHAR)),
+                      ObjectName->Buffer + (SoftwarePrefix.Length / sizeof(WCHAR)),
+                      ObjectName->Length - SoftwarePrefix.Length);
+    }
+
+    attr->ObjectName = NewName;
+    return TRUE;
+}

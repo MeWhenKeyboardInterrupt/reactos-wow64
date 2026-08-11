@@ -3,6 +3,7 @@
  *
  * Copyright 2021 Alexandre Julliard
  * Copyright 2025 Marcin Jabłoński
+ * Copyright 2026 Janczyk Nowak
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -56,7 +57,7 @@ NTSTATUS WINAPI wow64_NtCreateKey( UINT *args )
     NTSTATUS status;
 
     *handle_ptr = 0;
-    status = NtCreateKey( &handle, access, objattr_32to64( &attr, attr32 ), index,
+    status = NtCreateKey( &handle, access, objattr_32to64_registry( &attr, attr32, &access ), index,
                           unicode_str_32to64( &class, class32 ), options, dispos );
     put_handle( handle_ptr, handle );
     return status;
@@ -284,7 +285,7 @@ NTSTATUS WINAPI wow64_NtOpenKey( UINT *args )
     NTSTATUS status;
 
     *handle_ptr = 0;
-    status = NtOpenKey( &handle, access, objattr_32to64( &attr, attr32 ));
+    status = NtOpenKey( &handle, access, objattr_32to64_registry( &attr, attr32, &access ));
     put_handle( handle_ptr, handle );
     return status;
 }
