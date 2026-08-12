@@ -126,6 +126,7 @@ GetFileRedirect(OBJECT_ATTRIBUTES* attr)
  * \Registry\Machine\Software -> \Registry\Machine\Software\Wow6432Node
  *
  * TODO: Full exception list
+ * Windows has more exceptions, but they aren't in ReactOS's hives.
  */
 static
 BOOLEAN
@@ -252,9 +253,12 @@ GetRegistryRedirect(
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Clients"),
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Ole"),
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Rpc"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\CTF\\SystemShared"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\CTF\\TIP"),
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows\\CurrentVersion\\App Paths"),
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies"),
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows\\CurrentVersion\\Setup"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows\\CurrentVersion\\Control Panel\\Cursors\\Schemes"),
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Console"),
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\FontLink"),
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\FontMapper"),
@@ -264,6 +268,7 @@ GetRegistryRedirect(
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Print"),
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList"),
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Time Zones"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\FontDpi"),
     };
 
     PUNICODE_STRING ObjectName;
