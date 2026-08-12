@@ -122,8 +122,11 @@ GetFileRedirect(OBJECT_ATTRIBUTES* attr)
  * Wow6432Node. KEY_WOW64_64KEY forces the 64 bit view, KEY_WOW64_32KEY forces the 32 bit
  * view. Both flags set is invalid!
  *
- * For now, only handle the most important case:
- * \Registry\Machine\Software -> \Registry\Machine\Software\Wow6432Node
+ * Handled:
+ * HKLM\Software -> HKLM\Software\Wow6432Node
+ * HKLM\Software\Classes\{CLSID,Interface,...} -> HKLM\Software\Classes\Wow6432Node\...
+ * HKCU\...\Software\Classes\{CLSID,Interface,...} -> ...\Classes\Wow6432Node\...
+ * 
  *
  * TODO: Full exception list
  * Windows has more exceptions, but they aren't in ReactOS's hives.
@@ -225,6 +228,31 @@ BuildAbsoluteRegistryPath(
 }
 
 static
+USHORT
+FindSubstringOffset(
+    _In_ PUNICODE_STRING Haystack,
+    _In_ PCUNICODE_STRING Needle)
+{
+    USHORT hayLen = Haystack->Length / sizeof(WCHAR);
+    USHORT needleLen = Needle->Length / sizeof(WCHAR);
+    USHORT i;
+
+    if (needleLen == 0 || hayLen < needleLen)
+        return (USHORT)-1;
+
+    for (i = 0; i <= hayLen - needleLen; i++)
+    {
+        if (_wcsnicmp(Haystack->Buffer + i, Needle->Buffer, needleLen) == 0)
+        {
+            /* ensure we matched on a path component boundary */
+            if (i > 0 && Haystack->Buffer[i - 1] != L'\\')
+                continue;
+            return i * sizeof(WCHAR);
+        }
+    }
+    return (USHORT)-1;
+}
+static
 BOOLEAN
 GetRegistryRedirect(
     _Inout_ POBJECT_ATTRIBUTES attr,
@@ -235,6 +263,10 @@ GetRegistryRedirect(
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software");
     static const UNICODE_STRING WowNode =
         RTL_CONSTANT_STRING(L"\\Wow6432Node");
+    static const UNICODE_STRING ClassesComponent =
+        RTL_CONSTANT_STRING(L"\\Software\\Classes");
+    static const UNICODE_STRING ClassesSuffix =          /* SID_Classes */
+        RTL_CONSTANT_STRING(L"_Classes");
 
     /* Under Software\Classes these stay redirected (even though Classes is shared) */
     static const UNICODE_STRING RedirectedUnderClasses[] =
@@ -244,6 +276,16 @@ GetRegistryRedirect(
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Classes\\DirectShow"),
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Classes\\Media Type"),
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Classes\\MediaFoundation"),
+    };
+
+    /* Same children under any user's Classes (both \Software\Classes and _Classes forms) */
+    static const UNICODE_STRING RedirectedUnderUserClasses[] =
+    {
+        RTL_CONSTANT_STRING(L"\\CLSID"),
+        RTL_CONSTANT_STRING(L"\\Interface"),
+        RTL_CONSTANT_STRING(L"\\DirectShow"),
+        RTL_CONSTANT_STRING(L"\\Media Type"),
+        RTL_CONSTANT_STRING(L"\\MediaFoundation"),
     };
 
     /* The following keys are shared keys that exist in ReactOS hives but are Win7+. */
@@ -275,11 +317,13 @@ GetRegistryRedirect(
     PUNICODE_STRING RootName;
     PUNICODE_STRING NewName;
     USHORT NewLength;
+    USHORT InsertOffset;
     ACCESS_MASK Access;
     BOOLEAN Want32BitView;
     BOOLEAN RelativeOpen;
     ULONG i;
     BOOLEAN ForceRedirect = FALSE;
+    BOOLEAN IsUserClassesChild = FALSE;
 
     *RedirectStatus = STATUS_SUCCESS;
 
@@ -326,42 +370,87 @@ GetRegistryRedirect(
             return FALSE;
     }
 
-    if (ObjectName->Length < SoftwarePrefix.Length)
-        return FALSE;
-
-    if (_wcsnicmp(ObjectName->Buffer,
-                  SoftwarePrefix.Buffer,
-                  SoftwarePrefix.Length / sizeof(WCHAR)) != 0)
+    if (IsPrefixMatch(ObjectName, &SoftwarePrefix))
     {
-        return FALSE;
-    }
-
-    /* Already under Wow6432Node */
-    if (ObjectName->Length >= SoftwarePrefix.Length + WowNode.Length &&
-        _wcsnicmp(ObjectName->Buffer + (SoftwarePrefix.Length / sizeof(WCHAR)),
-                  WowNode.Buffer,
-                  WowNode.Length / sizeof(WCHAR)) == 0)
-    {
-        return FALSE;
-    }
-
-    /* Classes children that remain redirected */
-    for (i = 0; i < RTL_NUMBER_OF(RedirectedUnderClasses); i++)
-    {
-        if (IsPrefixMatch(ObjectName, &RedirectedUnderClasses[i]))
+        /* Already under Wow6432Node */
+        if (ObjectName->Length >= SoftwarePrefix.Length + WowNode.Length &&
+            _wcsnicmp(ObjectName->Buffer + (SoftwarePrefix.Length / sizeof(WCHAR)),
+                      WowNode.Buffer,
+                      WowNode.Length / sizeof(WCHAR)) == 0)
         {
-            ForceRedirect = TRUE;
-            break;
+            return FALSE;
+        }
+
+        /* Classes children that remain redirected */
+        for (i = 0; i < RTL_NUMBER_OF(RedirectedUnderClasses); i++)
+        {
+            if (IsPrefixMatch(ObjectName, &RedirectedUnderClasses[i]))
+            {
+                ForceRedirect = TRUE;
+                /* "\Registry\Machine\Software\Classes" length */
+                InsertOffset = SoftwarePrefix.Length +
+                               sizeof(L"\\Classes") - sizeof(WCHAR);
+                break;
+            }
+        }
+
+        if (!ForceRedirect)
+        {
+            for (i = 0; i < RTL_NUMBER_OF(SharedPrefixes); i++)
+            {
+                if (IsPrefixMatch(ObjectName, &SharedPrefixes[i]))
+                    return FALSE;
+            }
+
+            /* or if it's an ordinary Software subkey, insert after Software */
+            InsertOffset = SoftwarePrefix.Length;
         }
     }
-
-    if (!ForceRedirect)
+    else
     {
-        for (i = 0; i < RTL_NUMBER_OF(SharedPrefixes); i++)
+        USHORT classesOffset;
+        USHORT afterClasses;
+
+        /* ...\Software\Classes\... */
+        classesOffset = FindSubstringOffset(ObjectName, &ClassesComponent);
+        if (classesOffset != (USHORT)-1)
         {
-            if (IsPrefixMatch(ObjectName, &SharedPrefixes[i]))
+            afterClasses = classesOffset + ClassesComponent.Length;
+        }
+        else
+        {
+            /* \Registry\User\<SID>_Classes\... */
+            classesOffset = FindSubstringOffset(ObjectName, &ClassesSuffix);
+            if (classesOffset == (USHORT)-1)
                 return FALSE;
+            afterClasses = classesOffset + ClassesSuffix.Length;
         }
+
+        /* Already under Wow6432Node */
+        if (ObjectName->Length >= afterClasses + WowNode.Length &&
+            _wcsnicmp(ObjectName->Buffer + (afterClasses / sizeof(WCHAR)),
+                      WowNode.Buffer,
+                      WowNode.Length / sizeof(WCHAR)) == 0)
+        {
+            return FALSE;
+        }
+
+        /* Only the special children get redirected */
+        for (i = 0; i < RTL_NUMBER_OF(RedirectedUnderUserClasses); i++)
+        {
+            USHORT childOff = FindSubstringOffset(ObjectName,
+                                                  &RedirectedUnderUserClasses[i]);
+            if (childOff != (USHORT)-1 && childOff >= afterClasses)
+            {
+                IsUserClassesChild = TRUE;
+                break;
+            }
+        }
+
+        if (!IsUserClassesChild)
+            return FALSE;
+
+        InsertOffset = afterClasses;
     }
 
     NewLength = ObjectName->Length + WowNode.Length;
@@ -373,17 +462,17 @@ GetRegistryRedirect(
     NewName->Length = NewLength;
     NewName->MaximumLength = NewLength;
 
-    RtlCopyMemory(NewName->Buffer, ObjectName->Buffer, SoftwarePrefix.Length);
-    RtlCopyMemory(NewName->Buffer + (SoftwarePrefix.Length / sizeof(WCHAR)),
+    RtlCopyMemory(NewName->Buffer, ObjectName->Buffer, InsertOffset);
+    RtlCopyMemory(NewName->Buffer + (InsertOffset / sizeof(WCHAR)),
                   WowNode.Buffer,
                   WowNode.Length);
 
-    if (ObjectName->Length > SoftwarePrefix.Length)
+    if (ObjectName->Length > InsertOffset)
     {
         RtlCopyMemory(NewName->Buffer +
-                          ((SoftwarePrefix.Length + WowNode.Length) / sizeof(WCHAR)),
-                      ObjectName->Buffer + (SoftwarePrefix.Length / sizeof(WCHAR)),
-                      ObjectName->Length - SoftwarePrefix.Length);
+                          ((InsertOffset + WowNode.Length) / sizeof(WCHAR)),
+                      ObjectName->Buffer + (InsertOffset / sizeof(WCHAR)),
+                      ObjectName->Length - InsertOffset);
     }
 
     attr->ObjectName = NewName;
