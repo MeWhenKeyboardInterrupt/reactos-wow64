@@ -288,29 +288,63 @@ GetRegistryRedirect(
         RTL_CONSTANT_STRING(L"\\MediaFoundation"),
     };
 
-    /* The following keys are shared keys that exist in ReactOS hives but are Win7+. */
+    /* The following shared keys include the ones that exist in ReactOS, and the ones that don't. 
+     * This is the Win7+ table, and it might change in the future.
+     * See: https://learn.microsoft.com/en-us/windows/win32/winprog64/shared-registry-keys
+     */
     static const UNICODE_STRING SharedPrefixes[] =
     {
+        /* Classes itself + shared children (CLSID/Interface/... forced above) */
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Classes"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Classes\\Appid"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Classes\\HCP"),
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Clients"),
-        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Ole"),
-        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Rpc"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\COM3"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Cryptography\\Calais\\Current"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Cryptography\\Calais\\Readers"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Cryptography\\Services"),
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\CTF\\SystemShared"),
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\CTF\\TIP"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\DFS"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Driver Signing"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\EnterpriseCertificates"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\EventSystem"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\MSMQ"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Non-Driver Signing"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Notepad\\DefaultFonts"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Ole"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\RAS"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Rpc"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\SystemCertificates"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\TermServLicensing"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\TransactionServer"),
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows\\CurrentVersion\\App Paths"),
-        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies"),
-        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows\\CurrentVersion\\Setup"),
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows\\CurrentVersion\\Control Panel\\Cursors\\Schemes"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\AutoplayHandlers"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\DriveIcons"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\KindMap"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows\\CurrentVersion\\Group Policy"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows\\CurrentVersion\\PreviewHandlers"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows\\CurrentVersion\\Setup"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows\\CurrentVersion\\Telephony\\Locations"),   
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Console"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\FontDpi"),
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\FontLink"),
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\FontMapper"),
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts"),
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\FontSubstitutes"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Gre_Initialize"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Language Pack"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\NetworkCards"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Perflib"),
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Ports"),
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Print"),
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList"),
         RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Time Zones"),
-        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\FontDpi"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\Policies"),
+        RTL_CONSTANT_STRING(L"\\Registry\\Machine\\Software\\RegisteredApplications"),
     };
 
     PUNICODE_STRING ObjectName;
